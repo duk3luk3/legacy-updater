@@ -7,7 +7,7 @@ from PySide.QtSql import *
 from configobj import ConfigObj
 
 
-config = ConfigObj("/etc/faforever/faforever.conf")
+config = ConfigObj("updater.conf")
 
 class Process(QProcess):  # pragma: no cover
     def __init__(self, patch=None, *args, **kwargs):        

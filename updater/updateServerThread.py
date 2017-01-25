@@ -11,7 +11,7 @@ from PySide.QtSql import *
 from configobj import ConfigObj
 
 
-config = ConfigObj("/etc/faforever/faforever.conf")
+config = ConfigObj("updater.conf")
 
 class updateServerThread(QObject):  # pragma: no cover
     """

@@ -1,13 +1,32 @@
 #!/usr/bin/env python
 
-from logging import handlers
+import sys
+import logging
+from logging.config import dictConfig
+
+logging_config = dict(
+    version = 1,
+    formatters = {
+        'f': {'format':
+              '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'}
+        },
+    handlers = {
+        'h': {'class': 'logging.StreamHandler',
+              'formatter': 'f',
+              'level': logging.DEBUG}
+        },
+    loggers = {
+        '': {'handlers': ['h'],
+	     'level': logging.DEBUG}
+        }
+)
+
+dictConfig(logging_config)
 
 from PySide.QtCore import QObject, QCoreApplication
 from PySide import QtNetwork,QtSql
 
 from passwords import DB_SERVER, DB_PORT, DB_LOGIN, DB_PASSWORD, DB_NAME
-import config
-from config import Config
 
 #update server
 from updater.updateServer import *
@@ -19,13 +38,7 @@ class start(QObject):
     def __init__(self, parent=None):
         try:
             super(start, self).__init__(parent)
-            self.rootlogger = logging.getLogger("")
-            self.logHandler = handlers.RotatingFileHandler(config.LOG_PATH + "serverUpdater.log", backupCount=15, maxBytes=524288)
-            self.logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(name)-20s %(message)s')
-            self.logHandler.setFormatter(self.logFormatter)
-            self.rootlogger.addHandler(self.logHandler)
-            self.rootlogger.setLevel(eval("logging." + Config['serverUpdater']['loglevel']))
-            self.logger = logging.getLogger(__name__)
+            self.logger = logging.getLogger()
 
             self.logger.info("Update server starting")
             self.db = QtSql.QSqlDatabase("QMYSQL")
@@ -55,7 +68,8 @@ class start(QObject):
             self.logger.exception("Error: %r" % e)
 
 if __name__ == '__main__':
-    logger = logging.getLogger(__name__)
+    print("Running updater server")
+    logger = logging.getLogger()
     import sys
 
     try:
@@ -63,6 +77,7 @@ if __name__ == '__main__':
         app = QCoreApplication(sys.argv)
         server = start()
         app.exec_()
+        print("Shutting down")
 
     except Exception as e:
 
