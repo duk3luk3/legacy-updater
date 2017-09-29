@@ -18,8 +18,8 @@ class updateServerThread(QObject):  # pragma: no cover
     FA server thread spawned upon every incoming connection to
     prevent collisions.
     """
-    
-    
+
+
     def __init__(self, socketId, parent=None):
         super(updateServerThread, self).__init__(parent)
 
@@ -29,25 +29,25 @@ class updateServerThread(QObject):  # pragma: no cover
         self.app = None
         self.tableMod = "updates_faf"
         self.tableModFiles = "updates_faf_files"
-                
+
         self.socket = QtNetwork.QTcpSocket(self)
         self.socket.setSocketDescriptor(socketId)
         self.parent = parent
 
         self.patchToCreate = []
-        
+
         if self.socket.state() == 3 and self.socket.isValid():
-            
+
             self.nextBlockSize = 0
-    
-            self.blockSize = 0   
+
+            self.blockSize = 0
 
             self.socket.readyRead.connect(self.readDatas)
             self.socket.disconnected.connect(self.disconnection)
             self.socket.error.connect(self.displayError)
 
-            self.parent.db.open()   
-              
+            self.parent.db.open()
+
 
     def getMd5(self, fileName):
         """
@@ -56,24 +56,24 @@ class updateServerThread(QObject):  # pragma: no cover
         """
         m = hashlib.md5()
         if not os.path.isfile(fileName): return None
-        
+
         fd = open(fileName, "rb")
         while True:
             #read the file in 1 MiB chunks, this requires less memory in case one day we need to read something big, like textures.scd or units.scd
-            content = fd.read(1024*1024) 
+            content = fd.read(1024*1024)
             if not content: break
             m.update(content)
         fd.close()
-            
+
         return m.hexdigest()
 
     def updateMd5Db(self, table):
         query = QSqlQuery(self.parent.db)
         query.prepare("SELECT `name` FROM %s WHERE `md5` = ''"% table)
         query.exec_()
-        
+
         if  query.size() > 0:
-            
+
             while query.next():
                 file = str(query.value(0))
                 fullPath = None
@@ -90,8 +90,8 @@ class updateServerThread(QObject):  # pragma: no cover
                         query2.addBindValue(md5)
                         query2.addBindValue(file)
                         query2.exec_()
-                
-                
+
+
     def getFileListFromDb(self, table, folder):
         files = []
         query = QSqlQuery(self.parent.db)
@@ -108,8 +108,8 @@ class updateServerThread(QObject):  # pragma: no cover
 
     def getFileVersion(self, f, version, exact=False):
         query = QSqlQuery(self.parent.db)
-        
-        
+
+
         query.prepare("( \
 select  `name` , `version`  \
 from    `%s` \
@@ -128,19 +128,19 @@ order by `version` desc \
 limit 1 \
 ) \
 order by abs(`version` - ?) \
-limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod))        
-        
+limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod))
+
         query.addBindValue(version)
         query.addBindValue(f)
         query.addBindValue(version)
         query.addBindValue(f)
         query.addBindValue(version)
-        
+
         query.exec_()
-        
+
 
         if  query.size() >= 1:
-            query.first()  
+            query.first()
             if exact:
                 if int(query.value(1)) == int(version):
                     return str(query.value(0))
@@ -150,7 +150,7 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                     return None
                 else:
                     return str(query.value(0))
-            return None  
+            return None
 
     def getLatestFile(self, file):
         query = QSqlQuery(self.parent.db)
@@ -159,9 +159,9 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
         query.exec_()
 
         if  query.size() >= 1:
-            query.first()    
-            return str(query.value(0))    
-        
+            query.first()
+            return str(query.value(0))
+
     def handleAction(self, action, stream):
         if action == "REQUEST_SIM_PATH":
             uid = stream.readQString()
@@ -175,22 +175,22 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                 self.sendReply("PATH_TO_SIM_MOD", pathToMod)
             else:
                 self.sendReply("SIM_MOD_NOT_FOUND")
-        
+
         if action == "ADD_DOWNLOAD_SIM_MOD":
             uid = stream.readQString()
             query = QSqlQuery(self.parent.db)
             query.prepare("UPDATE `table_mod` SET downloads=downloads+1 WHERE uid = ?")
             query.addBindValue(uid)
             query.exec_()
-                        
 
-        
+
+
         if action == "GET_FILES_TO_UPDATE":
-            
+
             app = stream.readQString()
             self.app = app
-           
-  
+
+
             if app == 'FAF':
                 self.tableMod = "updates_faf"
                 self.tableModFiles = "updates_faf_files"
@@ -203,44 +203,44 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
 #                self.tableModFiles = "updates_balancetesting_files"
 #                files = self.getFileListFromDb(self.tableMod , "bin")
 #                self.sendReply("LIST_FILES_TO_UP", files)
-               
+
             elif "gamedata" in app.lower():
                 files = self.getFileListFromDb(self.tableMod, "gamedata")
-                self.sendReply("LIST_FILES_TO_UP", files) 
+                self.sendReply("LIST_FILES_TO_UP", files)
             else:
                 self.tableMod = "updates_" + app
                 self.tableModFiles = self.tableMod + "_files"
                 files = self.getFileListFromDb(self.tableMod, "bin")
                 self.sendReply("LIST_FILES_TO_UP", files)
-        
-        
-        
+
+
+
         if action == "REQUEST_VERSION":
             path = stream.readQString()
-            file = stream.readQString()   
-            version = stream.readQString()         
-           
+            file = stream.readQString()
+            version = stream.readQString()
+
             myFile = self.getFileVersion(file, version)
             #self.log.debug(myFile)
             if myFile is None:
                 self.sendReply("UP_TO_DATE", file)
             else:
-                patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + myFile    
+                patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + myFile
                 patchFilePath =  os.path.join(config['global']['content_path'] + r"updaterNew/", self.tableModFiles, myFile)
-    
-               
+
+
                 if os.path.isfile(patchFilePath):
                     #patchFile = QFile(patchFilePath)
-                    self.sendReply("SEND_FILE_PATH", path, file, patchFileUrl)          
+                    self.sendReply("SEND_FILE_PATH", path, file, patchFileUrl)
                 else:
-                    self.log.debug("File not found: " + patchFilePath) 
+                    self.log.debug("File not found: " + patchFilePath)
                     self.sendReply("ERROR_FILE", file)
 
         if action == "REQUEST_MOD_VERSION":
             path = stream.readQString()
-            f = stream.readQString()   
+            f = stream.readQString()
             toVersions = json.loads(stream.readQString())
-            version = 0         
+            version = 0
 
             query = QSqlQuery(self.parent.db)
             query.prepare("SELECT id FROM `%s` WHERE `filename` = ?" % self.tableMod)
@@ -249,40 +249,40 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
             if query.size() != 0:
                 query.first()
                 fileId = str(query.value(0))
-                if fileId:                    
+                if fileId:
                     if fileId in toVersions:
                         version = toVersions[fileId]
 
-            
+
             fileVersion = self.getFileVersion(f, version, exact=True)
             if self.tableModFiles and fileVersion:
-                patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + fileVersion     
+                patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + fileVersion
                 patchFilePath =  os.path.join(config['global']['content_path'] + r"updaterNew", self.tableModFiles, fileVersion)
-    
-               
+
+
                 if os.path.isfile(patchFilePath):
 
                     #patchFile = QFile(patchFilePath)
-                    self.sendReply("SEND_FILE_PATH", path, f, patchFileUrl)          
+                    self.sendReply("SEND_FILE_PATH", path, f, patchFileUrl)
                 else:
-                    self.log.debug("File not found: " + patchFilePath) 
-                    self.sendReply("ERROR_FILE", f)    
+                    self.log.debug("File not found: " + patchFilePath)
+                    self.sendReply("ERROR_FILE", f)
             else:
-                self.sendReply("ERROR_FILE", f)         
+                self.sendReply("ERROR_FILE", f)
         if action == "REQUEST" or action == "REQUEST_PATH":
             path = stream.readQString()
             file = stream.readQString()
             ##self.log.debug("requesting file %s" % file)
-            patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + self.getLatestFile(file)    
+            patchFileUrl =  config['global']['content_url'] + "updaterNew/" + self.tableModFiles + "/" + self.getLatestFile(file)
             patchFilePath =  os.path.join(config['global']['content_path'] + r"updaterNew", self.tableModFiles, self.getLatestFile(file))
-            
-            
+
+
             if os.path.isfile(patchFilePath):
 
                 #patchFile = QFile(patchFilePath)
-                self.sendReply("SEND_FILE_PATH", path, file, patchFileUrl)          
-            else: 
-                self.log.debug("File not found: " + patchFilePath) 
+                self.sendReply("SEND_FILE_PATH", path, file, patchFileUrl)
+            else:
+                self.log.debug("File not found: " + patchFilePath)
                 self.sendReply("ERROR_FILE", file)
 
 
@@ -291,28 +291,28 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
             file = stream.readQString()
             md5 = stream.readQString()
             toVersion = stream.readQString()
- 
+
             #self.log.debug(toVersion)
             #self.log.debug("got app ?")
             if self.app is not None:
                 self.updateMd5Db(self.tableModFiles)
                 query = QSqlQuery(self.parent.db)
-                query.prepare("SELECT `md5`, `name` FROM `%s` LEFT JOIN `%s` ON `%s`.`id` = `%s`.`fileId` WHERE `%s`.`filename` = ? AND `%s`.`version` <= ?  AND obselete = 0 ORDER BY `version` DESC" % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles))                
+                query.prepare("SELECT `md5`, `name` FROM `%s` LEFT JOIN `%s` ON `%s`.`id` = `%s`.`fileId` WHERE `%s`.`filename` = ? AND `%s`.`version` <= ?  AND obselete = 0 ORDER BY `version` DESC" % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles))
                 query.addBindValue(file)
                 query.addBindValue(toVersion)
                 query.exec_()
                 if  query.size() >= 1:
-                    
+
                     query.first()
                     tomd5 = str(query.value(0))
                     tofilename = str(query.value(1))
-                    
+
                     if str(md5) != str(tomd5):
                         queryStr = "SELECT patchFile FROM patchs_table WHERE fromMd5 = '%s' and toMd5 = '%s' " % (md5, tomd5)
-                        query.exec_(queryStr)                       
-                        if  query.size() >= 1: 
+                        query.exec_(queryStr)
+                        if  query.size() >= 1:
                             query.first()
-                            patch = str(query.value(0))                           
+                            patch = str(query.value(0))
                             patchFileUrl =  config['global']['content_url'] + "xdelta/" + str(patch)
                             self.sendReply("SEND_PATCH_URL", dir, file, patchFileUrl)
                         else:
@@ -326,26 +326,26 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                                 patch = dict(mod=self.tableModFiles, patchfile = patchfile, tofilename = tofilename, md5 = md5, tomd5 = tomd5)
                                 self.patchToCreate.append(patch)
                                 #self.parent.createPatch(self.tableModFiles, str(patchfile), str(tofilename), md5, tomd5)
-                                
+
                                 self.sendReply("VERSION_PATCH_NOT_FOUND",  file)
                             else:
-                                self.sendReply("VERSION_PATCH_NOT_FOUND",  file)                                                     
+                                self.sendReply("VERSION_PATCH_NOT_FOUND",  file)
                     else:
-                        self.sendReply("UP_TO_DATE", file)           
+                        self.sendReply("UP_TO_DATE", file)
                 else:
                     self.sendReply("VERSION_PATCH_NOT_FOUND",  file)
             else:
-                self.sendReply("VERSION_PATCH_NOT_FOUND",  file) 
-                        
+                self.sendReply("VERSION_PATCH_NOT_FOUND",  file)
+
         if action == "MOD_PATCH_TO":
             dir = stream.readQString()
             file = stream.readQString()
             md5 = stream.readQString()
-            toVersions = json.loads(stream.readQString())            
+            toVersions = json.loads(stream.readQString())
             version = 0
             if not toVersions:
                 self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)
-            
+
             if self.app is not None:
                 fileId = 0
                 self.updateMd5Db(self.tableModFiles)
@@ -358,24 +358,24 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                     fileId = str(query.value(0))
                     if fileId in toVersions:
                         version = toVersions[fileId]
-                        
-                    
+
+
                 query.prepare("SELECT `md5`, `name` FROM `%s` LEFT JOIN `%s` ON `%s`.`id` = `%s`.`fileId` WHERE `%s`.`filename` = ? AND `%s`.`version` <= ?  AND obselete = 0 ORDER BY `version` DESC" % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles))
                 query.addBindValue(file)
                 query.addBindValue(version)
                 query.exec_()
                 if  query.size() >= 1:
-                    
+
                     query.first()
                     tomd5 = str(query.value(0))
                     tofilename = str(query.value(1))
-                    
+
                     if str(md5) != str(tomd5):
                         queryStr = "SELECT patchFile FROM patchs_table WHERE fromMd5 = '%s' and toMd5 = '%s' " % (md5, tomd5)
-                        query.exec_(queryStr)                       
-                        if  query.size() >= 1: 
+                        query.exec_(queryStr)
+                        if  query.size() >= 1:
                             query.first()
-                            patch = str(query.value(0))                           
+                            patch = str(query.value(0))
                             patchFileUrl =  config['global']['content_url'] + "xdelta/" + str(patch)
                             self.sendReply("SEND_PATCH_URL", dir, file, patchFileUrl)
                         else:
@@ -392,25 +392,25 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                                 #self.parent.createPatch(self.tableModFiles, str(patchfile), str(tofilename), md5, tomd5)
                                 self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)
                             else:
-                                self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)                                                     
+                                self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)
                     else:
-                        self.sendReply("UP_TO_DATE", file)           
+                        self.sendReply("UP_TO_DATE", file)
                 else:
                     self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)
             else:
                 self.sendReply("VERSION_MOD_PATCH_NOT_FOUND",  file)
-                                   
-                                   
-                                   
+
+
+
         if action == "UPDATE" or action == "UPDATE_PATH":
             dir = stream.readQString()
             file = stream.readQString()
             md5 = stream.readQString()
 
             if self.app is not None:
-                
+
                 self.updateMd5Db(self.tableModFiles)
-                
+
                 query = QSqlQuery(self.parent.db)
                 query.prepare("SELECT `md5`, `name` FROM `%s` LEFT JOIN `%s` ON `%s`.`id` = `%s`.`fileId` WHERE `%s`.`filename` = ?  AND obselete = 0 ORDER BY `%s`.`version` DESC" % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFiles, self.tableMod, self.tableModFiles))
                 query.addBindValue(file)
@@ -423,10 +423,10 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                     if str(md5) != str(latestMd5):
                         queryStr = "SELECT patchFile FROM patchs_table WHERE fromMd5 = '%s' and toMd5 = '%s' " % (md5, latestMd5)
                         query.exec_(queryStr)
-                        
-                        if  query.size() >= 1: 
+
+                        if  query.size() >= 1:
                             query.first()
-                            patch = str(query.value(0))                           
+                            patch = str(query.value(0))
                             patchFileUrl =  config['global']['content_url'] + "xdelta/" + str(patch)
                             self.sendReply("SEND_PATCH_URL", dir, file, patchFileUrl)
                         else:
@@ -442,12 +442,12 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
                                 self.patchToCreate.append(patch)
 
                                 #self.parent.createPatch(self.tableModFiles, str(patchfile), str(latestName), md5, latestMd5)
-    
+
                                 self.sendReply("PATCH_NOT_FOUND",  file)
                             else:
                                 self.sendReply("PATCH_NOT_FOUND",  file)
                     else:
-                        self.sendReply("UP_TO_DATE", file)           
+                        self.sendReply("UP_TO_DATE", file)
                 else:
                     self.sendReply("PATCH_NOT_FOUND",  file)
 
@@ -499,33 +499,33 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
         self.done()
 
     def sendReply(self, action, *args, **kwargs):
-        
+
         try:
-            
+
             if hasattr(self, "socket"):
 
                 reply = QByteArray()
                 stream = QDataStream(reply, QIODevice.WriteOnly)
                 stream.setVersion(QDataStream.Qt_4_2)
                 stream.writeUInt32(0)
-                
+
                 stream.writeQString(action)
 
-    
+
                 for arg in args:
                     if isinstance(arg, int):
                         stream.writeInt(int(arg))
-                    elif isinstance(arg, str):                       
-                        stream.writeQString(arg) 
+                    elif isinstance(arg, str):
+                        stream.writeQString(arg)
                     elif isinstance(arg, list):
-                        stream.writeQString(str(arg))                        
+                        stream.writeQString(str(arg))
 
                 #stream << action << options
                 stream.device().seek(0)
-                
+
                 stream.writeUInt32(reply.size() - 4)
 
-                
+
                 self.socket.write(reply)
 
 
@@ -535,8 +535,8 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
 #                self.quit()
 
         except:
-                self.log.exception("Something awful happened when sending reply !")  
-  
+                self.log.exception("Something awful happened when sending reply !")
+
     def done(self):
         if self.socket is not None:
             #self.parent.addSocketToDelete(self.socket)
@@ -546,15 +546,15 @@ limit 1   " % (self.tableModFiles, self.tableMod, self.tableMod, self.tableModFi
             self.socket.close()
             #self.socket.deleteLater()
             self.socket = None
-        
+
         if len(self.patchToCreate) > 0:
             self.parent.createPatch(self.patchToCreate)
 
 
         self.parent.removeUpdater(self)
-        
-        
-        
+
+
+
     # Display errors from servers
     def displayError(self, socketError):
         pass
