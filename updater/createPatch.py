@@ -36,7 +36,7 @@ class createPatch(QThread):  # pragma: no cover
             frommd5 = patch["md5"]
             tomd5 = patch["tomd5"]
 
-            curPatchGen = "%s-%s.xdelta" % (fromFile, toFile)
+            curPatchGen = "%s_%s-%s_%s.xdelta" % (fromFile, frommd5[:8], toFile, tomd5[:8])
 
             self.logger.debug(curPatchGen)
 
